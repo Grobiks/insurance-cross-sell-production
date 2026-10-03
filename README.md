@@ -1,87 +1,141 @@
-# Insurance cross-sell: production ML pipeline
+# Кросс-продажи страхования: ML-проект в production-виде
 
-Binary classification: will a health-insurance customer also buy vehicle insurance?
-Dataset: Kaggle Playground S4E7 (11.5M rows, ~12% positives, metric F1).
+Бинарная классификация: купит ли клиент, уже застраховавший здоровье, ещё и страховку на автомобиль.
+Данные: Kaggle Playground S4E7 (11.5 млн строк, около 12% положительных ответов, метрика F1).
 
-The project was refactored from a team research notebook
-([`notebooks/01_research_notebook.ipynb`](notebooks/01_research_notebook.ipynb))
-into an installable, tested package with a CLI, linters, pre-commit and Docker.
+Команда «Страховщики»: Роман Осипов, Дмитрий Мартынов, Дмитрий Иванков.
 
-Team "Страховщики": Роман Осипов, Дмитрий Мартынов, Дмитрий Иванков.
+Репозиторий подготовлен по заданию преподавателя: рефакторинг ML-проекта под production-стандарты,
+настройка poetry, pre-commit и линтеров, интеграция виртуального окружения в Git-репозиторий.
 
-## Quick start
+## Что было изначально
+
+Проект существовал как **один командный Jupyter-ноутбук**
+([`notebooks/01_research_notebook.ipynb`](notebooks/01_research_notebook.ipynb)):
+
+- исследовательский анализ данных (распределения, аномалии, корреляции, выводы);
+- предобработка через `ColumnTransformer` и свой `ThresholdFrequencyEncoder`;
+- класс `ModelFactory` с методами `run_base`, `run_grid`, `run_optuna`;
+- четыре модели (логистическая регрессия, Random Forest, LightGBM, CatBoost), каждая в трёх вариантах:
+  фиксированные параметры, GridSearchCV, Optuna; обучение на стратифицированной выборке 3%;
+- сравнение моделей по F1 и ROC-AUC (лучший результат: LightGBM, F1 около 0.475).
+
+Чего в проекте **не было**: пакета с модулями, тестов, управления зависимостями (только ячейка
+`!pip install`), линтеров, сохранения обученной модели, кода для предсказаний на новых данных,
+проверки входных данных, Docker и CI. Всё это жило в ячейках ноутбука, а данные подгружались по
+ссылке, которая сейчас возвращает 404.
+
+Результаты исходных запусков сохранены в [`docs/RESULTS.md`](docs/RESULTS.md).
+
+## Что сделано по заданию преподавателя
+
+### 1. Рефакторинг под production-стандарты
+
+Код из ноутбука перенесён в установленный пакет `src/insurance_cross_sell/`:
+
+```
+src/insurance_cross_sell/
+  config.py    константы, группы признаков, подобранные гиперпараметры
+  data.py      загрузка, проверка схемы, очистка, стратифицированная выборка и разбиение
+  features.py  ThresholdFrequencyEncoder, CategoryCaster, препроцессоры
+  models.py    пайплайн для каждой модели: logreg, random_forest, lightgbm, catboost
+  evaluate.py  метрики, важность признаков
+  bundle.py    модель + порог + метаданные, сохранение через joblib
+  train.py     обучение            tuning.py  необязательный подбор (Grid / Optuna)
+  predict.py   предсказания        cli.py     команда `insurance`
+tests/         тесты (на синтетических данных, скачивание не нужно)
+notebooks/     01 архив исходного ноутбука, 02 демо работы с пакетом
+docs/          результаты исходных запусков и воспроизведённые результаты
+```
+
+Что появилось в проекте:
+
+- **Командная строка:** `insurance download | train | tune | predict`.
+- **Сохранение и загрузка модели** вместе с порогом и метаданными, **проверка входных данных**
+  при предсказании (нет колонок, пропуски, неизвестные категории, отрицательные значения).
+- **Тесты:** 32 теста (pytest), проверяют в том числе, что сохранённая модель загружается в отдельном процессе.
+- **Docker** (`Dockerfile`) и **CI** (GitHub Actions: pre-commit, тесты, сборка образа).
+- **Логирование** вместо `print`, типы, отсутствие глобального состояния.
+
+**Не нужно переобучать часами.** Лучшие гиперпараметры из исходных долгих запусков (Grid и Optuna)
+записаны в `config.BEST_PARAMS`. Команда `insurance train` обучает каждую финальную модель один раз:
+на реальных данных все четыре модели обучаются меньше чем за две минуты. Подбор параметров вынесен
+в отдельную необязательную команду `insurance tune`.
+
+**Ошибки исходного ноутбука, найденные и исправленные при рефакторинге:**
+
+| Ошибка в ноутбуке | Как исправлено |
+|---|---|
+| Параметр `threshold=0.69` принимался, но игнорировался (жёстко стоял 0.5) | Один явный `THRESHOLD` в конфиге, меняется флагом `--threshold` |
+| Названия в Feature Importance не совпадали со значениями: `ColumnTransformer` переставляет колонки, а имена брались из `X_train.columns` | Имена берутся из `get_feature_names_out()`. Реальный главный признак CatBoost: `Previously_Insured` (47%), а не `Annual_Premium` (50%), как показывал ноутбук |
+| У логистической регрессии результаты «Fixed / Grid / Optuna» совпадали: `class_weight='balanced'` был зашит во всех трёх | Одна модель с одной подобранной конфигурацией |
+| В LightGBM и CatBoost категориальные признаки шли через `remainder="passthrough"`, поведение было неочевидным | Категории объявлены явно (`category` / `cat_features`) |
+| Кастомный трансформер жил в ноутбуке: сохранённая модель не загрузилась бы в другом процессе | Трансформер вынесен в пакет |
+| Optuna обращалась к приватному API `scorer._score_func`; в пространстве поиска Random Forest были бессмысленные параметры | Публичный API sklearn, пространство поиска исправлено |
+| Весь CSV (11.5 млн строк) загружался в память целиком | Чтение кусками по 1 млн строк с выборкой на лету |
+| Ссылка на данные из ноутбука возвращает 404 | Рабочая ссылка в конфиге, проверка SHA-256, скачивание в 32 параллельных потока |
+
+Так как категориальные признаки теперь обрабатываются иначе, итоговые метрики отличаются от
+ноутбука не более чем на 0.007 F1. Воспроизведённые результаты на реальных данных
+(выборка 3%, порог 0.5), тестовая выборка:
+
+| Модель | F1 | ROC-AUC |
+|---|---|---|
+| Логистическая регрессия | 0.403 | 0.836 |
+| Random Forest | 0.444 | 0.861 |
+| **LightGBM** | **0.477** | **0.873** |
+| CatBoost | 0.472 | 0.868 |
+
+### 2. Poetry, pre-commit, линтеры
+
+| Инструмент | Для чего | Команда |
+|---|---|---|
+| Poetry | зависимости, lock-файл, окружение `.venv` внутри проекта | `poetry install` |
+| ruff | линтер и форматтер | `poetry run ruff check .` |
+| mypy | статическая проверка типов | `poetry run mypy` |
+| pre-commit | ruff, mypy, nbstripout (очистка вывода ноутбуков), пробелы и окончания строк, защита от больших файлов, проверка yaml и toml: при каждом коммите | `poetry run pre-commit run --all-files` |
+| pytest | тесты | `poetry run pytest` |
+
+Версии ruff и mypy в Poetry зафиксированы такими же, как в хуках pre-commit, чтобы результаты совпадали.
+
+### 3. Виртуальное окружение и Git
+
+Папка `.venv/` **не коммитится** (сотни мегабайт, привязана к ОС и путям). В Git лежит всё, что
+нужно для её точного воспроизведения: `pyproject.toml`, `poetry.lock` и `poetry.toml`
+(`in-project = true`, окружение создаётся в папке проекта). После клонирования достаточно `poetry install`.
+
+### 4. Тесты на hh.ru
+
+Сдаются отдельно скриншотами: машинное обучение, Python, SQL, Docker/Git/Linux/ООП.
+
+## Быстрый старт
+
+Нужны Python 3.10-3.13 и [Poetry](https://python-poetry.org/) 2.x.
 
 ```bash
-poetry install                      # creates .venv inside the project from poetry.lock
-poetry run pre-commit install       # enable git hooks
+poetry install                      # создаёт .venv в папке проекта по poetry.lock
+poetry run pre-commit install       # включает git-хуки
 
-poetry run insurance download       # cache the dataset in data/raw/ (632 MB, git-ignored, checksum-verified)
-poetry run insurance train          # fit all models on the 3% stratified sample
+poetry run insurance download       # скачивает данные в data/raw/ (632 МБ, не коммитятся, проверяются по SHA-256)
+poetry run insurance train          # обучает все модели на выборке 3%
 poetry run insurance predict --model-path artifacts/lightgbm/model.joblib \
     --input new_customers.csv --output predictions.csv
 ```
 
-Requirements: Python 3.10-3.13 and [Poetry](https://python-poetry.org/) 2.x
-(`pipx install poetry` or `pip install --user poetry`).
-The EDA-only libraries (`phik`, `klib`, `shap`, `matplotlib`) are an optional group:
-`poetry install --with eda`.
+Библиотеки только для разведочного анализа (`phik`, `klib`, `shap`, `matplotlib`) вынесены в
+необязательную группу: `poetry install --with eda`.
 
-## No hours-long retraining
+Быстрая проверка на кусочке данных: `insurance train --nrows 50000 --sample-frac 1.0`.
 
-The original notebook spent hours on GridSearchCV/Optuna. The best hyperparameters from
-those runs are stored in [`config.BEST_PARAMS`](src/insurance_cross_sell/config.py), so
-`insurance train` only **fits each final model once** (seconds to a few minutes on the 3%
-sample). Searching is a separate, optional command:
+Повторный подбор гиперпараметров (долго):
 
 ```bash
 poetry run insurance tune --model lightgbm --method optuna --n-trials 30
 poetry run insurance train --model lightgbm --params-file artifacts/best_params_lightgbm.json
 ```
 
-Quick smoke run on a slice of the data: `insurance train --nrows 50000 --sample-frac 1.0`.
-
-`insurance download` fetches the 632 MB file in 32 parallel range requests by default
-(`--workers`): on some networks a single connection to GitHub LFS is throttled to tens of
-KB/s, while parallel connections reach the full bandwidth. The file is verified by SHA-256.
-
-## Layout
-
-```
-src/insurance_cross_sell/
-  config.py    constants, column groups, tuned hyperparameters
-  data.py      download, load, schema validation, cleaning, stratified sample/split
-  features.py  ThresholdFrequencyEncoder, CategoryCaster, preprocessors
-  models.py    pipeline per model: logreg, random_forest, lightgbm, catboost
-  evaluate.py  metrics, feature importance
-  bundle.py    pipeline + threshold + metadata, saved with joblib
-  train.py     training workflow        tuning.py  optional grid / Optuna search
-  predict.py   batch inference          cli.py     `insurance` command
-tests/         pytest suite (synthetic data, no download needed)
-notebooks/     01 archived research notebook (outputs stripped), 02 demo that uses the package
-docs/          results of the original runs
-```
-
-## Quality tooling
-
-| Tool | Purpose | Run |
-|---|---|---|
-| Poetry | dependency management, lock file, in-project `.venv` | `poetry install` |
-| ruff | lint + format | `poetry run ruff check .` |
-| mypy | static types | `poetry run mypy` |
-| pre-commit | ruff, mypy, nbstripout, whitespace/EOF, large-file guard on every commit | `poetry run pre-commit run --all-files` |
-| pytest | unit and end-to-end tests | `poetry run pytest` |
-| GitHub Actions | pre-commit + tests + Docker build on push/PR | `.github/workflows/ci.yml` |
-
-### About the virtual environment and Git
-
-`.venv/` is **not** committed (hundreds of MB, tied to one OS and path). What is committed
-is everything needed to recreate it exactly: `pyproject.toml`, `poetry.lock` and
-`poetry.toml` (`in-project = true`). A fresh clone is ready with `poetry install`.
-
-## Security note
-
-Models are stored with `joblib` (pickle). Loading a pickle can execute arbitrary code, so
-only load `model.joblib` files that you produced yourself or got from a trusted source.
+`insurance download` качает файл параллельными запросами (`--workers`): в некоторых сетях одно
+соединение с GitHub LFS ограничено десятками КБ/с, а параллельные соединения выбирают всю полосу.
 
 ## Docker
 
@@ -91,31 +145,7 @@ docker run --rm -v "$PWD/data:/app/data" -v "$PWD/artifacts:/app/artifacts" \
     insurance-cross-sell train --model lightgbm
 ```
 
-## Changes relative to the notebook
+## Замечание по безопасности
 
-Bugs found during the refactor and how they are handled:
-
-- **Threshold**: `ModelFactory(threshold=0.69)` was ignored (hard-coded 0.5). Now one
-  explicit `THRESHOLD` in config, overridable with `--threshold`.
-- **Feature importance names**: labels came from `X_train.columns` while the
-  `ColumnTransformer` reorders columns. Names now come from `get_feature_names_out()`,
-  so importances must be re-read (the notebook's "Annual_Premium 50%" is likely
-  `Previously_Insured`).
-- **Categorical handling in LightGBM/CatBoost** is now explicit (`category` dtype /
-  `cat_features`) instead of relying on `remainder="passthrough"`.
-- **Logistic regression** had identical "Fixed / Grid / Optuna" results in the notebook
-  because `class_weight='balanced'` was hard-coded in all three; it is now a single model
-  with one tuned configuration.
-- **Memory**: the CSV is read in 1M-row chunks and subsampled chunk by chunk, so the 11.5M-row
-  frame is never held in memory (the notebook loaded it entirely).
-- **Data URL**: the `media.githubusercontent.com/.../refs/heads/main/...` link from the
-  notebook returns 404 now; `config.DATA_URL` uses the working LFS link and the download is
-  verified by SHA-256.
-- **Custom transformer** lives in the package, so saved models load in any process.
-- **Optuna** uses the public sklearn scoring API instead of `scorer._score_func`; the
-  Random Forest search space no longer includes the degenerate
-  `min_weight_fraction_leaf` up to 0.5.
-- Input validation at inference, logging instead of `print`, no global state.
-
-Because categorical handling changed, final scores can differ slightly from the notebook;
-see [`docs/RESULTS.md`](docs/RESULTS.md) for the original numbers to compare against.
+Модели сохраняются через `joblib` (pickle). Загрузка pickle-файла может выполнить произвольный код,
+поэтому открывайте только `model.joblib`, созданные вами или полученные из надёжного источника.
