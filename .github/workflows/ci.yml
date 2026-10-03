@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py3.12-${{ hashFiles('poetry.lock') }}
+
+      - name: Check pyproject.toml and poetry.lock are in sync
+        run: poetry check --lock
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Lint (pre-commit)
+        run: poetry run pre-commit run --all-files --show-diff-on-failure
+
+      - name: Test
+        run: poetry run pytest --cov=insurance_cross_sell --cov-report=term-missing
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t insurance-cross-sell .
+      - name: Smoke test image
+        run: docker run --rm insurance-cross-sell train --help

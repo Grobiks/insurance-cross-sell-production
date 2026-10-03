@@ -1,0 +1,31 @@
+# Virtual environment (recreated from poetry.lock via `poetry install`)
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Data and artifacts (large, reproducible)
+data/
+artifacts/
+*.joblib
+*.pkl
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
