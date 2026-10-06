@@ -1,4 +1,4 @@
-"""Model registry: one sklearn `Pipeline` (preprocessor + classifier) per model name."""
+"""Model registry: one sklearn `Pipeline` per model name."""
 
 from __future__ import annotations
 
@@ -19,9 +19,11 @@ def build_pipeline(
     random_state: int = config.RANDOM_STATE,
     n_jobs: int = -1,
 ) -> Pipeline:
-    """Build an unfitted pipeline for `name`; `params` override the tuned defaults."""
+    """Build an unfitted pipeline; `params` override tuned defaults."""
     if name not in config.BEST_PARAMS:
-        raise ValueError(f"Unknown model {name!r}; choose from {config.MODEL_NAMES}")
+        raise ValueError(
+            f"Unknown model {name!r}; choose from {config.MODEL_NAMES}"
+        )
     merged = {**config.BEST_PARAMS[name], **(params or {})}
 
     classifier: Any
@@ -41,8 +43,9 @@ def build_pipeline(
         )
     elif name == "lightgbm":
         preprocessor = build_native_preprocessor(cat_as_str=False)
-        # NB: as in the notebook, `subsample` has no effect without `subsample_freq`;
-        # kept as-is so the tuned parameters reproduce the reported scores.
+        # NB: as in the notebook, `subsample` has no effect without
+        # `subsample_freq`; kept as-is so the tuned parameters reproduce
+        # the reported scores.
         classifier = LGBMClassifier(
             random_state=random_state,
             n_jobs=n_jobs,
@@ -67,4 +70,6 @@ def build_pipeline(
             **merged,
         )
 
-    return Pipeline([("preprocessor", preprocessor), ("classifier", classifier)])
+    return Pipeline(
+        [("preprocessor", preprocessor), ("classifier", classifier)]
+    )

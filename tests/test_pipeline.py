@@ -10,18 +10,22 @@ from insurance_cross_sell.bundle import ModelBundle
 from insurance_cross_sell.cli import main
 from insurance_cross_sell.evaluate import feature_importance
 from insurance_cross_sell.models import build_pipeline
-from insurance_cross_sell.train import fit_and_evaluate, prepare_split, save_run
+from insurance_cross_sell.train import (
+    fit_and_evaluate,
+    prepare_split,
+    save_run,
+)
 
 
 @pytest.mark.parametrize("name", config.MODEL_NAMES)
 def test_every_model_fits_and_predicts(name, raw_df, fast_params):
-    X = raw_df[config.FEATURE_COLUMNS]
+    x = raw_df[config.FEATURE_COLUMNS]
     y = raw_df[config.TARGET]
 
-    pipeline = build_pipeline(name, fast_params[name], n_jobs=1).fit(X, y)
-    proba = pipeline.predict_proba(X)
+    pipeline = build_pipeline(name, fast_params[name], n_jobs=1).fit(x, y)
+    proba = pipeline.predict_proba(x)
 
-    assert proba.shape == (len(X), 2)
+    assert proba.shape == (len(x), 2)
     assert ((proba >= 0) & (proba <= 1)).all()
 
 
@@ -42,20 +46,28 @@ def test_models_learn_signal(csv_path, fast_params):
     assert bundle.metrics["test"]["roc_auc"] > 0.75
 
 
-def test_feature_importance_names_match_transformed_columns(raw_df, fast_params):
-    X = raw_df[config.FEATURE_COLUMNS]
-    pipeline = build_pipeline("lightgbm", fast_params["lightgbm"]).fit(X, raw_df[config.TARGET])
+def test_feature_importance_names_match_transformed_columns(
+    raw_df, fast_params
+):
+    x = raw_df[config.FEATURE_COLUMNS]
+    pipeline = build_pipeline("lightgbm", fast_params["lightgbm"]).fit(
+        x, raw_df[config.TARGET]
+    )
 
     importance = feature_importance(pipeline)
 
-    assert set(importance["feature"]) == set(pipeline[:-1].get_feature_names_out())
-    # The synthetic target is driven by damage / prior insurance, not by sex.
+    assert set(importance["feature"]) == set(
+        pipeline[:-1].get_feature_names_out()
+    )
+    # The synthetic target depends on damage / prior insurance, not sex.
     top = set(importance["feature"].head(3))
     assert {"Vehicle_Damage", "Previously_Insured"} <= top
 
 
-def test_saved_model_loads_in_fresh_process_and_predicts(tmp_path, csv_path, raw_df, fast_params):
-    """Guards against pickling custom classes defined in __main__ / a notebook."""
+def test_saved_model_loads_in_fresh_process_and_predicts(
+    tmp_path, csv_path, raw_df, fast_params
+):
+    """Guard against pickling classes defined in __main__."""
     split = prepare_split(csv_path, sample_frac=1.0)
     bundle = fit_and_evaluate("catboost", split, fast_params["catboost"])
     run_dir = save_run(bundle, tmp_path / "artifacts")
@@ -63,13 +75,20 @@ def test_saved_model_loads_in_fresh_process_and_predicts(tmp_path, csv_path, raw
     sample.to_csv(tmp_path / "new.csv")
 
     code = (
-        "from insurance_cross_sell.bundle import ModelBundle; import pandas as pd, sys;"
+        "from insurance_cross_sell.bundle import ModelBundle;"
+        "import pandas as pd, sys;"
         "b = ModelBundle.load(sys.argv[1]);"
         "df = pd.read_csv(sys.argv[2], index_col='id');"
         "print(len(b.predict(df)))"
     )
     result = subprocess.run(
-        [sys.executable, "-c", code, str(run_dir / "model.joblib"), str(tmp_path / "new.csv")],
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(run_dir / "model.joblib"),
+            str(tmp_path / "new.csv"),
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -81,20 +100,24 @@ def test_saved_model_loads_in_fresh_process_and_predicts(tmp_path, csv_path, raw
 
 
 def test_bundle_rejects_bad_input(tmp_path, raw_df, fast_params):
-    X = raw_df[config.FEATURE_COLUMNS]
-    pipeline = build_pipeline("logreg", fast_params["logreg"]).fit(X, raw_df[config.TARGET])
+    x = raw_df[config.FEATURE_COLUMNS]
+    pipeline = build_pipeline("logreg", fast_params["logreg"]).fit(
+        x, raw_df[config.TARGET]
+    )
     bundle = ModelBundle("logreg", pipeline)
     path = bundle.save(tmp_path / "m.joblib")
 
     loaded = ModelBundle.load(path)
-    out = loaded.predict(X.head(3))
+    out = loaded.predict(x.head(3))
     assert list(out.columns) == ["probability", "prediction"]
 
     with pytest.raises(ValueError, match="Missing required columns"):
-        loaded.predict(X.drop(columns=["Age"]))
+        loaded.predict(x.drop(columns=["Age"]))
 
 
-def test_cli_train_then_predict(tmp_path, csv_path, raw_df, capsys, monkeypatch, fast_params):
+def test_cli_train_then_predict(
+    tmp_path, csv_path, raw_df, capsys, monkeypatch, fast_params
+):
     from insurance_cross_sell import config as cfg
 
     # keep the CLI run fast: shrink the stored best params

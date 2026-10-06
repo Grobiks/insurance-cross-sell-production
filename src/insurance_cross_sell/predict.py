@@ -10,8 +10,10 @@ from . import config
 from .bundle import ModelBundle
 
 
-def predict_file(model_path: Path, input_csv: Path, output_csv: Path) -> pd.DataFrame:
-    """Score a CSV with the raw feature columns and write probability + prediction."""
+def predict_file(
+    model_path: Path, input_csv: Path, output_csv: Path
+) -> pd.DataFrame:
+    """Score a CSV of raw features; write probability and class."""
     bundle = ModelBundle.load(model_path)
     df = pd.read_csv(input_csv)
     if config.ID_COLUMN in df.columns:

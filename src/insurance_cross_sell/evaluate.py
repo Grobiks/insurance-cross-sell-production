@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.pipeline import Pipeline
 
 from . import config
@@ -15,7 +20,7 @@ def compute_metrics(
     proba: np.ndarray,
     threshold: float = config.THRESHOLD,
 ) -> dict[str, float]:
-    """Precision/recall/F1 at `threshold` plus threshold-free ROC-AUC."""
+    """Precision, recall, F1 at `threshold`, and ROC-AUC."""
     pred = (proba >= threshold).astype(int)
     return {
         "precision": float(precision_score(y_true, pred, zero_division=0)),
@@ -26,11 +31,12 @@ def compute_metrics(
 
 
 def feature_importance(pipeline: Pipeline) -> pd.DataFrame:
-    """Importance per *transformed* feature, named via the preprocessor.
+    """Return importance per *transformed* feature, with its name.
 
-    The research notebook labelled importances with the raw `X_train.columns`, but the
-    ColumnTransformer reorders columns, so the names were wrong. Using
-    `get_feature_names_out()` keeps names and values aligned.
+    The research notebook labelled importances with the raw
+    `X_train.columns`, but the ColumnTransformer reorders columns, so
+    the names were wrong. Using `get_feature_names_out()` keeps names
+    and values aligned.
     """
     names = list(pipeline.named_steps["preprocessor"].get_feature_names_out())
     classifier = pipeline.named_steps["classifier"]

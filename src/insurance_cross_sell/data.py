@@ -36,16 +36,22 @@ RANGE_CHUNK = 4 * (1 << 20)
 
 def _download_stream(url: str, out_path: Path) -> None:
     """Single connection; used when the file size is unknown."""
-    with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as response, open(out_path, "wb") as out:
+    with (
+        urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as response,
+        open(out_path, "wb") as out,
+    ):
         while block := response.read(1 << 20):
             out.write(block)
 
 
-def _download_ranges(url: str, out_path: Path, size: int, workers: int) -> None:
+def _download_ranges(
+    url: str, out_path: Path, size: int, workers: int
+) -> None:
     """Fetch the file as parallel HTTP Range requests.
 
-    Some networks throttle each connection to a few dozen KB/s (observed with GitHub
-    LFS), while many parallel connections reach the full bandwidth.
+    Some networks throttle each connection to a few dozen KB/s
+    (observed with GitHub LFS), while many parallel connections reach
+    the full bandwidth.
     """
     with open(out_path, "wb") as f:
         f.truncate(size)
@@ -57,11 +63,17 @@ def _download_ranges(url: str, out_path: Path, size: int, workers: int) -> None:
         end = min(start + RANGE_CHUNK, size) - 1
         for attempt in range(5):
             try:
-                request = urllib.request.Request(url, headers={"Range": f"bytes={start}-{end}"})
-                with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+                request = urllib.request.Request(
+                    url, headers={"Range": f"bytes={start}-{end}"}
+                )
+                with urllib.request.urlopen(
+                    request, timeout=HTTP_TIMEOUT
+                ) as response:
                     data = response.read()
                 if len(data) != end - start + 1:
-                    raise OSError(f"expected {end - start + 1} bytes, got {len(data)}")
+                    raise OSError(
+                        f"expected {end - start + 1} bytes, got {len(data)}"
+                    )
                 break
             except OSError:
                 if attempt == 4:
@@ -86,9 +98,10 @@ def download_data(
     size: int | None = config.DATA_SIZE_BYTES,
     workers: int = 32,
 ) -> Path:
-    """Download the raw CSV once, verify its checksum and cache it on disk.
+    """Download the raw CSV once, verify its checksum, cache it.
 
-    With a known `size` and `workers > 1` the file is fetched in parallel ranges.
+    With a known `size` and `workers > 1` the file is fetched in
+    parallel ranges.
     """
     path = Path(path)
     if path.exists() and not force:
@@ -105,7 +118,9 @@ def download_data(
 
     if sha256 is not None and _sha256(tmp_path) != sha256:
         tmp_path.unlink()
-        raise OSError(f"Checksum mismatch for {url}: the downloaded file is corrupted")
+        raise OSError(
+            f"Checksum mismatch for {url}: the downloaded file is corrupted"
+        )
     tmp_path.replace(path)
     return path
 
@@ -117,7 +132,7 @@ CSV_DTYPES = {
     "Vintage": "int16",
     "Response": "int8",
     "Annual_Premium": "float32",
-    # Region_Code stays float64: 39.2 must compare exactly equal to the anomaly marker
+    # Region_Code stays float64: 39.2 must equal the anomaly marker
 }
 CHUNK_ROWS = 1_000_000
 
@@ -129,23 +144,32 @@ def load_sample(
     nrows: int | None = None,
     chunksize: int = CHUNK_ROWS,
 ) -> pd.DataFrame:
-    """Read the CSV in chunks, clean and stratified-subsample each chunk.
+    """Read the CSV in chunks; clean and subsample each chunk.
 
-    Peak memory is one chunk plus the sample, instead of the whole 11.5M-row frame.
-    Duplicates are only removed within a chunk (the EDA found none in the full data).
+    Peak memory is one chunk plus the sample, instead of the whole
+    11.5M-row frame. Duplicates are only removed within a chunk (the
+    EDA found none in the full data).
     """
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found. Run `insurance download` or pass --data-path.")
+        raise FileNotFoundError(
+            f"{path} not found. Run `insurance download` or pass --data-path."
+        )
     reader = pd.read_csv(
-        path, index_col=config.ID_COLUMN, dtype=CSV_DTYPES, nrows=nrows, chunksize=chunksize
+        path,
+        index_col=config.ID_COLUMN,
+        dtype=CSV_DTYPES,
+        nrows=nrows,
+        chunksize=chunksize,
     )
-    parts = [stratified_sample(clean(chunk), frac, random_state) for chunk in reader]
+    parts = [
+        stratified_sample(clean(chunk), frac, random_state) for chunk in reader
+    ]
     return pd.concat(parts)
 
 
 def validate_features(df: pd.DataFrame) -> None:
-    """Check that `df` has every feature column and only allowed categorical values."""
+    """Check `df` has all feature columns and only allowed values."""
     missing = [c for c in config.FEATURE_COLUMNS if c not in df.columns]
     if missing:
         raise SchemaError(f"Missing required columns: {missing}")
@@ -158,28 +182,40 @@ def validate_features(df: pd.DataFrame) -> None:
         unexpected = set(df[column].dropna().unique()) - allowed
         if unexpected:
             raise SchemaError(
-                f"Column {column!r} has unexpected values: {sorted(unexpected, key=str)}"
+                f"Column {column!r} has unexpected values: "
+                f"{sorted(unexpected, key=str)}"
             )
 
-    numeric = [*config.OUTLIER_NUM_COLS, *config.NUM_COLS, *config.HIGH_CARDINALITY_COLS]
+    numeric = [
+        *config.OUTLIER_NUM_COLS,
+        *config.NUM_COLS,
+        *config.HIGH_CARDINALITY_COLS,
+    ]
     for column in numeric:
         if not pd.api.types.is_numeric_dtype(df[column]):
-            raise SchemaError(f"Column {column!r} must be numeric, got {df[column].dtype}")
+            raise SchemaError(
+                f"Column {column!r} must be numeric, got {df[column].dtype}"
+            )
         if (df[column] < 0).any():
             raise SchemaError(f"Column {column!r} contains negative values")
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
-    """Training-time cleaning: drop duplicates and the single anomalous region row.
+    """Training-time cleaning: drop duplicates and the anomalous row.
 
-    The EDA found no missing values; if new data introduces NaNs the rows are
-    dropped here rather than silently passed to the models.
+    The EDA found no missing values; if new data introduces NaNs the
+    rows are dropped here rather than silently passed to the models.
     """
     before = len(df)
     df = df[df["Region_Code"] != config.ANOMALOUS_REGION_CODE]
     df = df.dropna(subset=[*config.FEATURE_COLUMNS, config.TARGET])
     df = df.drop_duplicates()
-    logger.info("Cleaning removed %d rows (%d -> %d)", before - len(df), before, len(df))
+    logger.info(
+        "Cleaning removed %d rows (%d -> %d)",
+        before - len(df),
+        before,
+        len(df),
+    )
     return df
 
 
@@ -201,8 +237,10 @@ def split_xy(
     test_size: float = config.TEST_SIZE,
     random_state: int = config.RANDOM_STATE,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """Stratified train/test split; split happens before any fitting (no leakage)."""
+    """Stratified train/test split, made before any fitting."""
     validate_features(df)
-    X = df[config.FEATURE_COLUMNS]
+    x = df[config.FEATURE_COLUMNS]
     y = df[config.TARGET]
-    return train_test_split(X, y, test_size=test_size, stratify=y, random_state=random_state)
+    return train_test_split(
+        x, y, test_size=test_size, stratify=y, random_state=random_state
+    )

@@ -90,7 +90,7 @@ docs/          результаты исходных запусков и вос�
 | Инструмент | Для чего | Команда |
 |---|---|---|
 | Poetry | зависимости, lock-файл, окружение `.venv` внутри проекта | `poetry install` |
-| ruff | линтер и форматтер | `poetry run ruff check .` |
+| ruff | линтер и форматтер: PEP 8 (строки 79, комментарии 72), именование, докстроки PEP 257 | `poetry run ruff check .` |
 | mypy | статическая проверка типов | `poetry run mypy` |
 | pre-commit | ruff, mypy, nbstripout (очистка вывода ноутбуков), пробелы и окончания строк, защита от больших файлов, проверка yaml и toml: при каждом коммите | `poetry run pre-commit run --all-files` |
 | pytest | тесты | `poetry run pytest` |
@@ -102,6 +102,16 @@ docs/          результаты исходных запусков и вос�
 Папка `.venv/` **не коммитится** (сотни мегабайт, привязана к ОС и путям). В Git лежит всё, что
 нужно для её точного воспроизведения: `pyproject.toml`, `poetry.lock` и `poetry.toml`
 (`in-project = true`, окружение создаётся в папке проекта). После клонирования достаточно `poetry install`.
+
+## Документация по модели
+
+| Документ | Содержание |
+|---|---|
+| [model_card.md](model_card.md) | Model Card по шаблону Google: назначение, данные, метрики, ограничения |
+| [Model_BPMN.md](Model_BPMN.md) | Место модели в бизнес-процессе (схема BPMN) |
+| [Model_retrain_BPMN.md](Model_retrain_BPMN.md) | Процесс автоматического переобучения: от триггера до деплоя |
+| [docs/RESULTS.md](docs/RESULTS.md), [docs/FULL_DATA_REPORT.md](docs/FULL_DATA_REPORT.md) | Результаты исходных запусков и обучения на всех данных |
+| [docs/PEP8_COMPARISON.md](docs/PEP8_COMPARISON.md) | Сверка кода с PEP 8, PEP 257 и PEP 484 |
 
 ## Быстрый старт
 

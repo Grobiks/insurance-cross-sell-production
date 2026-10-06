@@ -18,7 +18,10 @@ FAST_PARAMS = {
 
 
 def make_synthetic(n: int = 2000, seed: int = 0) -> pd.DataFrame:
-    """Rows shaped like the Kaggle data; `Response` depends on damage / prior insurance."""
+    """Rows shaped like the Kaggle data.
+
+    `Response` depends on damage and prior insurance.
+    """
     rng = np.random.default_rng(seed)
     damage = rng.choice(["Yes", "No"], n)
     insured = rng.integers(0, 2, n)
@@ -35,7 +38,9 @@ def make_synthetic(n: int = 2000, seed: int = 0) -> pd.DataFrame:
             "Vehicle_Age": rng.choice(config.ORDINAL_ORDER, n),
             "Vehicle_Damage": damage,
             "Annual_Premium": rng.normal(30000, 15000, n).clip(2500, 540000),
-            "Policy_Sales_Channel": rng.choice([26.0, 124.0, 152.0, 160.0, 7.0], n),
+            "Policy_Sales_Channel": rng.choice(
+                [26.0, 124.0, 152.0, 160.0, 7.0], n
+            ),
             "Vintage": rng.integers(10, 300, n),
             config.TARGET: response,
         },

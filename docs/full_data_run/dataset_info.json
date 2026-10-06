@@ -1,0 +1,6 @@
+{
+  "sample_frac": 1.0,
+  "n_train": 8628597,
+  "n_test": 2876200,
+  "positive_rate": 0.123
+}

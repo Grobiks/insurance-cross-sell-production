@@ -1,4 +1,4 @@
-"""Project-wide constants: paths, column groups and tuned hyperparameters."""
+"""Project-wide constants: paths, column groups, tuned parameters."""
 
 from __future__ import annotations
 
@@ -6,36 +6,52 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Repository root (src/insurance_cross_sell/config.py -> ../..). Override with
-# INSURANCE_PROJECT_ROOT when the package is installed as a regular (non-editable) wheel.
-PROJECT_ROOT = Path(os.environ.get("INSURANCE_PROJECT_ROOT", Path(__file__).resolve().parents[2]))
+# Repository root (src/insurance_cross_sell/config.py -> ../..).
+# Override with INSURANCE_PROJECT_ROOT when the package is installed
+# as a regular (non-editable) wheel.
+PROJECT_ROOT = Path(
+    os.environ.get(
+        "INSURANCE_PROJECT_ROOT", Path(__file__).resolve().parents[2]
+    )
+)
 
-# --- data -----------------------------------------------------------------
-# The old `media.githubusercontent.com/.../refs/heads/main/...` link from the notebook
-# now returns 404; this one follows the Git LFS redirect.
-DATA_URL = "https://github.com/taysumova/urfu_ml/raw/main/data_sources/train.csv"
+# --- data -------------------------------------------------------------
+# The old `media.githubusercontent.com/.../refs/heads/main/...` link
+# from the notebook now returns 404; this one follows the Git LFS
+# redirect.
+DATA_URL = (
+    "https://github.com/taysumova/urfu_ml/raw/main/data_sources/train.csv"
+)
 # From the Git LFS pointer of that file: used to verify the download.
 DATA_SIZE_BYTES = 662_779_095
-DATA_SHA256 = "2bd6bd083cdfb9194dce39e521c4bbf4ca7a8fe8a221af35bb94a242d28b4517"
+DATA_SHA256 = (
+    "2bd6bd083cdfb9194dce39e521c4bbf4ca7a8fe8a221af35bb94a242d28b4517"
+)
 DATA_PATH = PROJECT_ROOT / "data" / "raw" / "train.csv"
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 
 TARGET = "Response"
 ID_COLUMN = "id"
 
-# The notebook trains on a stratified 3% subsample (~345k rows) for speed.
+# The notebook trains on a stratified 3% subsample (~345k rows).
 SAMPLE_FRAC = 0.03
 RANDOM_STATE = 42
 TEST_SIZE = 0.25
 CV_FOLDS = 3  # used only by the optional tuning commands
 
 # Decision threshold applied to predicted probabilities.
-# NB: the research notebook accepted `threshold=0.69` but silently used 0.5.
+# NB: the research notebook accepted `threshold=0.69` but silently
+# used 0.5.
 THRESHOLD = 0.5
 
-# --- features -------------------------------------------------------------
+# --- features ---------------------------------------------------------
 HIGH_CARDINALITY_COLS = ["Region_Code", "Policy_Sales_Channel"]
-BINARY_COLS = ["Gender", "Vehicle_Damage", "Previously_Insured", "Driving_License"]
+BINARY_COLS = [
+    "Gender",
+    "Vehicle_Damage",
+    "Previously_Insured",
+    "Driving_License",
+]
 ORDINAL_COL = "Vehicle_Age"
 ORDINAL_ORDER = ["< 1 Year", "1-2 Year", "> 2 Years"]
 OUTLIER_NUM_COLS = ["Annual_Premium"]
@@ -49,7 +65,7 @@ FEATURE_COLUMNS = [
     *NUM_COLS,
 ]
 
-# Allowed values for categorical inputs (used by input validation at inference).
+# Allowed values of categorical inputs (checked at inference).
 ALLOWED_VALUES: dict[str, set[Any]] = {
     "Gender": {"Male", "Female"},
     "Vehicle_Damage": {"Yes", "No"},
@@ -58,12 +74,13 @@ ALLOWED_VALUES: dict[str, set[Any]] = {
     "Previously_Insured": {0, 1},
 }
 
-# A single row with this Region_Code is an anomaly in the training data (see EDA).
+# One row with this Region_Code is an anomaly in the data (see EDA).
 ANOMALOUS_REGION_CODE = 39.2
 
-# --- tuned hyperparameters --------------------------------------------------
-# Taken from the notebook runs on the 3% sample, so the final models can be
-# re-fitted in seconds instead of repeating hours of grid/Optuna search.
+# --- tuned hyperparameters --------------------------------------------
+# Taken from the notebook runs on the 3% sample, so the final models
+# can be re-fitted in seconds instead of repeating hours of
+# grid/Optuna search.
 # Keys are bare estimator parameters (no `classifier__` prefix).
 BEST_PARAMS: dict[str, dict[str, Any]] = {
     # GridSearchCV best: C=100, l1_ratio=0.1, elasticnet

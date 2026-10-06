@@ -16,23 +16,31 @@ from .data import validate_features
 
 @dataclass
 class ModelBundle:
+    """A fitted pipeline with its threshold and metadata."""
+
     model_name: str
     pipeline: Pipeline
     threshold: float = config.THRESHOLD
-    feature_columns: list[str] = field(default_factory=lambda: list(config.FEATURE_COLUMNS))
+    feature_columns: list[str] = field(
+        default_factory=lambda: list(config.FEATURE_COLUMNS)
+    )
     metrics: dict[str, Any] = field(default_factory=dict)
     package_version: str = __version__
 
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Validate raw input and return probability and 0/1 prediction per row."""
+        """Validate raw input; return probability and 0/1 per row."""
         validate_features(df)
         proba = self.pipeline.predict_proba(df[self.feature_columns])[:, 1]
         return pd.DataFrame(
-            {"probability": proba, "prediction": (proba >= self.threshold).astype(int)},
+            {
+                "probability": proba,
+                "prediction": (proba >= self.threshold).astype(int),
+            },
             index=df.index,
         )
 
     def save(self, path: Path) -> Path:
+        """Write the bundle to `path` with joblib; return the path."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(self, path)
@@ -40,6 +48,7 @@ class ModelBundle:
 
     @staticmethod
     def load(path: Path) -> ModelBundle:
+        """Read a bundle from `path`; reject other pickled objects."""
         bundle = joblib.load(path)
         if not isinstance(bundle, ModelBundle):
             raise TypeError(f"{path} does not contain a ModelBundle")

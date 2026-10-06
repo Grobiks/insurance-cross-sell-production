@@ -1,4 +1,4 @@
-"""Download logic, tested against a fake HTTP server (no network access)."""
+"""Download logic, tested against a fake HTTP server (no network)."""
 
 import hashlib
 import io
@@ -24,10 +24,16 @@ def fake_server(monkeypatch):
     calls = []
 
     def urlopen(request, timeout=None):
-        headers = request.headers if isinstance(request, urllib.request.Request) else {}
+        headers = (
+            request.headers
+            if isinstance(request, urllib.request.Request)
+            else {}
+        )
         calls.append(headers.get("Range"))
         if "Range" in headers:
-            start, end = map(int, headers["Range"].removeprefix("bytes=").split("-"))
+            start, end = map(
+                int, headers["Range"].removeprefix("bytes=").split("-")
+            )
             return FakeResponse(PAYLOAD[start : end + 1])
         return FakeResponse(PAYLOAD)
 
@@ -39,15 +45,21 @@ SHA = hashlib.sha256(PAYLOAD).hexdigest()
 
 
 def test_parallel_download_reassembles_file(tmp_path, fake_server):
-    out = data.download_data(tmp_path / "f.csv", url="http://x", sha256=SHA, size=len(PAYLOAD))
+    out = data.download_data(
+        tmp_path / "f.csv", url="http://x", sha256=SHA, size=len(PAYLOAD)
+    )
 
     assert out.read_bytes() == PAYLOAD
-    assert len(fake_server) == -(-len(PAYLOAD) // data.RANGE_CHUNK)  # one request per chunk
+    assert len(fake_server) == -(
+        -len(PAYLOAD) // data.RANGE_CHUNK
+    )  # one request per chunk
     assert all(r and r.startswith("bytes=") for r in fake_server)
 
 
 def test_single_stream_download(tmp_path, fake_server):
-    out = data.download_data(tmp_path / "f.csv", url="http://x", sha256=SHA, size=None)
+    out = data.download_data(
+        tmp_path / "f.csv", url="http://x", sha256=SHA, size=None
+    )
 
     assert out.read_bytes() == PAYLOAD
     assert fake_server == [None]
@@ -55,7 +67,12 @@ def test_single_stream_download(tmp_path, fake_server):
 
 def test_checksum_mismatch_removes_partial_file(tmp_path, fake_server):
     with pytest.raises(OSError, match="Checksum mismatch"):
-        data.download_data(tmp_path / "f.csv", url="http://x", sha256="0" * 64, size=len(PAYLOAD))
+        data.download_data(
+            tmp_path / "f.csv",
+            url="http://x",
+            sha256="0" * 64,
+            size=len(PAYLOAD),
+        )
 
     assert list(tmp_path.iterdir()) == []
 

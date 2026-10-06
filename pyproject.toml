@@ -49,16 +49,24 @@ requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-line-length = 100
+# PEP 8: 79 characters for code, 72 for docstrings and comments
+line-length = 79
 target-version = "py310"
 src = ["src", "tests"]
 extend-exclude = ["notebooks"]  # research notebook is kept as-is
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]
+# E, W: pycodestyle (PEP 8); N: pep8-naming; D: docstrings (PEP 257)
+select = ["E", "F", "W", "I", "N", "D", "B", "UP", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 72
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["B011"]
+"tests/*" = ["B011", "D"]
 
 [tool.mypy]
 python_version = "3.12"

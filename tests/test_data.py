@@ -25,22 +25,26 @@ def test_stratified_sample_preserves_balance(raw_df):
     sample = stratified_sample(raw_df, 0.5)
 
     assert len(sample) == pytest.approx(len(raw_df) * 0.5, abs=2)
-    assert sample[config.TARGET].mean() == pytest.approx(raw_df[config.TARGET].mean(), abs=0.01)
+    assert sample[config.TARGET].mean() == pytest.approx(
+        raw_df[config.TARGET].mean(), abs=0.01
+    )
 
 
 def test_split_is_stratified_and_disjoint(raw_df):
-    X_train, X_test, y_train, y_test = split_xy(raw_df)
+    x_train, x_test, y_train, y_test = split_xy(raw_df)
 
-    assert set(X_train.index).isdisjoint(X_test.index)
+    assert set(x_train.index).isdisjoint(x_test.index)
     assert y_train.mean() == pytest.approx(y_test.mean(), abs=0.01)
-    assert list(X_train.columns) == config.FEATURE_COLUMNS
+    assert list(x_train.columns) == config.FEATURE_COLUMNS
 
 
 def test_load_sample_reads_in_chunks_and_stays_stratified(csv_path, raw_df):
     sample = load_sample(csv_path, frac=0.5, chunksize=300)
 
     assert len(sample) == pytest.approx(len(raw_df) * 0.5, abs=15)
-    assert sample[config.TARGET].mean() == pytest.approx(raw_df[config.TARGET].mean(), abs=0.02)
+    assert sample[config.TARGET].mean() == pytest.approx(
+        raw_df[config.TARGET].mean(), abs=0.02
+    )
     assert sample["Age"].dtype == "int16"
 
 
