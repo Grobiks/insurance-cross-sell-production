@@ -110,7 +110,7 @@ docs/          результаты исходных запусков и вос�
 | [model_card.md](model_card.md) | Model Card по шаблону Google: назначение, данные, метрики, ограничения |
 | [Model_BPMN.md](Model_BPMN.md) | Место модели в бизнес-процессе (схема BPMN) |
 | [Model_retrain_BPMN.md](Model_retrain_BPMN.md) | Процесс автоматического переобучения: от триггера до деплоя |
-| [docs/RESULTS.md](docs/RESULTS.md), [docs/FULL_DATA_REPORT.md](docs/FULL_DATA_REPORT.md) | Результаты исходных запусков и обучения на всех данных |
+| [docs/RESULTS.md](docs/RESULTS.md), [docs/FULL_DATA_REPORT.md](docs/FULL_DATA_REPORT.md), [docs/TUNING_REPORT.md](docs/TUNING_REPORT.md) | Результаты исходных запусков, обучения на всех данных и подбора параметров на больших данных |
 | [docs/PEP8_COMPARISON.md](docs/PEP8_COMPARISON.md) | Сверка кода с PEP 8, PEP 257 и PEP 484 |
 
 ## Быстрый старт

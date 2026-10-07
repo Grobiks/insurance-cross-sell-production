@@ -1,0 +1,25 @@
+{
+  "tune_total_frac": 0.4,
+  "trial_max_min": 25,
+  "n_trials": 20,
+  "time_budget_min": 360,
+  "val_auc_baseline_params": 0.8793695997043034,
+  "val_auc_best_params": 0.8801684907608256,
+  "best_params": {
+    "learning_rate": 0.03920673972242137,
+    "num_leaves": 242,
+    "max_depth": 9,
+    "min_child_samples": 140,
+    "subsample": 0.6682096494749166,
+    "colsample_bytree": 0.5325257964926398,
+    "reg_alpha": 6.245139574743075,
+    "reg_lambda": 7.2866537374910445,
+    "scale_pos_weight": 5.041986740582305
+  },
+  "trees": 2397,
+  "final_fit_seconds": 3412.2,
+  "best_threshold": 0.62,
+  "n_train_final": 8369739,
+  "n_val": 258858,
+  "n_test": 2876200
+}
