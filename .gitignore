@@ -29,3 +29,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# CatBoost training logs
+catboost_info/
