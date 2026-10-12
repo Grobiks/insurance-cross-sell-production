@@ -32,3 +32,6 @@ Thumbs.db
 
 # CatBoost training logs
 catboost_info/
+
+# Local model registry (retraining demo and runs)
+models/

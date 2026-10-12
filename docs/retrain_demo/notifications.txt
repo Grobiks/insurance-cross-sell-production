@@ -1,0 +1,6 @@
+2026-10-12T15:02:22+00:00 [INFO] cycle 1: v1 deployed (was None), ROC-AUC 0.8681
+2026-10-12T15:02:47+00:00 [INFO] cycle 2: v2 deployed (was v1), ROC-AUC 0.8751
+2026-10-12T15:02:47+00:00 [ERROR] cycle 3: data check failed (Missing values in columns: ['Annual_Premium']); production stays v2
+2026-10-12T15:03:10+00:00 [WARNING] cycle 4: v3 rejected by quality gates (min_auc, vs_champion_auc, vs_champion_f1); production stays v2
+2026-10-12T15:03:34+00:00 [INFO] cycle 5: v4 deployed (was v2), ROC-AUC 0.8736
+2026-10-12T15:03:59+00:00 [ERROR] cycle 6: deploy of v5 failed (simulated failure of the post-deploy check); rolled back to v4

@@ -1,0 +1,114 @@
+{
+  "cycle": 6,
+  "trigger": "schedule",
+  "started_at": "2026-10-12T15:03:34+00:00",
+  "data_files": [
+    "D:\\Учеба 3 семестр\\Бизнес-применение машинного обучения\\insurance-cross-sell\\data\\batches\\batch_05.csv",
+    "D:\\Учеба 3 семестр\\Бизнес-применение машинного обучения\\insurance-cross-sell\\data\\batches\\batch_06.csv"
+  ],
+  "status": "rolled_back",
+  "version": "v5",
+  "champion": "v4",
+  "production_after": "v4",
+  "approved_by": "auto (демо)",
+  "data": {
+    "new_batch_rows": 200000,
+    "new_batch_positive_rate": 0.1231,
+    "train_rows": 350000,
+    "holdout_rows": 50000
+  },
+  "drift": {
+    "Age": 0.1987,
+    "Annual_Premium": 0.0001,
+    "Vintage": 0.0001,
+    "Gender": 0.0,
+    "Vehicle_Age": 0.0,
+    "Vehicle_Damage": 0.0,
+    "Previously_Insured": 0.0
+  },
+  "gates": [
+    {
+      "name": "schema",
+      "passed": true,
+      "detail": "columns and values ok"
+    },
+    {
+      "name": "min_rows",
+      "passed": true,
+      "detail": "200000 rows (minimum 1000)"
+    },
+    {
+      "name": "positive_rate",
+      "passed": true,
+      "detail": "0.123 (expected 0.123 +/- 0.030)"
+    },
+    {
+      "name": "min_auc",
+      "passed": true,
+      "detail": "ROC-AUC 0.8686 (minimum 0.80)"
+    },
+    {
+      "name": "vs_champion_auc",
+      "passed": true,
+      "detail": "0.8686 vs champion 0.8687 (allowed drop 0.002)"
+    },
+    {
+      "name": "vs_champion_f1",
+      "passed": true,
+      "detail": "0.4694 vs champion 0.4705 (allowed drop 0.005)"
+    },
+    {
+      "name": "slices",
+      "passed": true,
+      "detail": "largest drop +0.0028 in Age=30-39 (allowed 0.02)"
+    },
+    {
+      "name": "top_features",
+      "passed": true,
+      "detail": "top features: ['Vehicle_Damage', 'Previously_Insured']"
+    },
+    {
+      "name": "load_test",
+      "passed": true,
+      "detail": "saved model reloads and predicts"
+    }
+  ],
+  "metrics": {
+    "challenger": {
+      "precision": 0.3313,
+      "recall": 0.8052,
+      "f1": 0.4694,
+      "roc_auc": 0.8686,
+      "slices": {
+        "Gender=Female": 0.8895,
+        "Gender=Male": 0.8494,
+        "Age=20-29": 0.9307,
+        "Age=30-39": 0.8188,
+        "Age=40-49": 0.7784,
+        "Age=50-59": 0.7879,
+        "Age=60+": 0.8121,
+        "Vehicle_Age=1-2 Year": 0.8077,
+        "Vehicle_Age=< 1 Year": 0.9355,
+        "Vehicle_Age=> 2 Years": 0.6704
+      }
+    },
+    "champion": {
+      "precision": 0.334,
+      "recall": 0.7956,
+      "f1": 0.4705,
+      "roc_auc": 0.8687,
+      "slices": {
+        "Gender=Female": 0.8898,
+        "Gender=Male": 0.8494,
+        "Age=20-29": 0.9298,
+        "Age=30-39": 0.8216,
+        "Age=40-49": 0.7756,
+        "Age=50-59": 0.7823,
+        "Age=60+": 0.8137,
+        "Vehicle_Age=1-2 Year": 0.8075,
+        "Vehicle_Age=< 1 Year": 0.935,
+        "Vehicle_Age=> 2 Years": 0.6687
+      }
+    }
+  }
+}

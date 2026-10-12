@@ -8,9 +8,10 @@
 версией, реестр версий, откат). Основной ориентир: документ Google Cloud
 [«MLOps: Continuous delivery and automation pipelines in machine learning»](https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning).
 
-> **Статус.** Схема и правила описывают целевой процесс. В проекте уже реализованы загрузка и проверка данных,
-> очистка, обучение, метрики, упаковка модели, Docker и CI. Планировщик, мониторинг дрейфа, реестр версий,
-> автоматический деплой и уведомления пока не реализованы; таблица в разделе 4 показывает, что есть, а чего нет.
+> **Статус.** Процесс реализован в коде (модуль `retrain.py`, команды `insurance retrain` и `insurance monitor`)
+> и проверен шестью запусками подряд на реальных данных: каждая ветка схемы, включая три ветки неуспеха,
+> сработала (отчёт [docs/RETRAIN_DEMO.md](docs/RETRAIN_DEMO.md)). Не реализованы только внешние части:
+> запуск по расписанию в CI, реестр и уведомления во внешних сервисах; см. таблицу в разделе 4.
 
 ## 1. Схема процесса (BPMN)
 
@@ -123,14 +124,20 @@ flowchart TB
 | Метрики, важность признаков, упаковка модели | реализовано | `metrics.json`, `ModelBundle` |
 | Тест загрузки модели в чистом процессе | реализовано | тест `test_saved_model_loads_in_fresh_process_and_predicts` |
 | Docker-образ, CI | реализовано | `Dockerfile`, `.github/workflows/ci.yml` |
-| Запуск по расписанию, ручной запуск | планируется | workflow GitHub Actions с `schedule` и `workflow_dispatch` |
-| Проверки качества и сравнение с действующей версией | планируется | скрипт, читающий `metrics.json` обеих версий |
-| Реестр версий моделей | планируется | GitHub Releases или MLflow Model Registry |
-| Деплой, откат | планируется | публикация Docker-образа, переключение активной версии |
-| Мониторинг дрейфа и качества | планируется | расчёт PSI, учёт `Response` |
-| Уведомления и логирование отказов | планируется | issue или сообщение в чат при ошибке |
+| Цикл целиком (этапы 2-8) | реализовано | `insurance retrain --data <окно> --trigger <причина>`, функция `run_cycle` |
+| Ручной запуск, причина запуска | реализовано | параметр `--trigger`: `manual`, `schedule`, `new_data`, `drift`, `degradation` |
+| Проверки данных | реализовано | схема и значения, объём партии, доля положительного класса (`check_data`) |
+| Проверки качества и сравнение с действующей версией | реализовано | порог ROC-AUC, сравнение ROC-AUC и F1 на одних свежих данных, срезы, главные признаки, тест загрузки (`check_quality`) |
+| Ручное одобрение (User Task) | реализовано | `insurance retrain` спрашивает подтверждение; флаг `--auto-approve` для демонстрации и CI |
+| Реестр версий моделей | реализовано локально | папка `models/`: `registry.json` со статусами `production`, `archived`, `rejected`, `rolled_back` (`ModelRegistry`) |
+| Деплой и откат | реализовано локально | переключение действующей версии в реестре, проверка после выкладки, автоматический откат |
+| Мониторинг дрейфа | реализовано | PSI признаков к обучающим данным действующей модели: `insurance monitor` |
+| Логирование и уведомления | реализовано локально | отчёт каждого цикла в JSON, журнал `notifications.log` |
+| Запуск по расписанию | планируется | workflow GitHub Actions с `schedule` (эскиз ниже) |
+| Внешний реестр и уведомления | планируется | MLflow Model Registry или GitHub Releases; сообщения в чат или почту |
+| Контроль фактического качества в эксплуатации | частично | сравнение на свежих размеченных данных выполняется в каждом цикле; отдельного мониторинга по мере поступления `Response` нет |
 
-### Эскиз запуска по расписанию (план, не реализован)
+### Эскиз запуска по расписанию (план: workflow ещё не добавлен в репозиторий)
 
 ```yaml
 name: retrain
@@ -145,10 +152,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: pipx install poetry && poetry install --no-interaction
       - run: poetry run insurance download
-      - run: poetry run insurance train --model lightgbm --out-dir artifacts/candidate
-      - run: poetry run python scripts/check_gates.py   # проверки раздела 3 (нужно написать)
-      - uses: actions/upload-artifact@v4                # регистрация кандидата
-        with: { name: candidate, path: artifacts/candidate }
+      - run: poetry run insurance monitor --data data/new_batch.csv || true
+      - run: >-
+          poetry run insurance retrain --trigger schedule --auto-approve
+          --data data/previous_batch.csv data/new_batch.csv
+      - uses: actions/upload-artifact@v4                # отчёт цикла и реестр
+        with: { name: registry, path: models }
 ```
 
 ## 5. Действия при неуспешных проверках

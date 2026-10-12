@@ -111,6 +111,7 @@ docs/          результаты исходных запусков и вос�
 | [Model_BPMN.md](Model_BPMN.md) | Место модели в бизнес-процессе (схема BPMN) |
 | [Model_retrain_BPMN.md](Model_retrain_BPMN.md) | Процесс автоматического переобучения: от триггера до деплоя |
 | [docs/RESULTS.md](docs/RESULTS.md), [docs/FULL_DATA_REPORT.md](docs/FULL_DATA_REPORT.md), [docs/TUNING_REPORT.md](docs/TUNING_REPORT.md) | Результаты исходных запусков, обучения на всех данных и подбора параметров на больших данных |
+| [docs/RETRAIN_DEMO.md](docs/RETRAIN_DEMO.md) | Демонстрация цикла переобучения: 6 запусков на реальных данных, все ветки процесса |
 | [docs/PEP8_COMPARISON.md](docs/PEP8_COMPARISON.md) | Сверка кода с PEP 8, PEP 257 и PEP 484 |
 
 ## Быстрый старт
@@ -125,6 +126,17 @@ poetry run insurance download       # скачивает данные в data/ra
 poetry run insurance train          # обучает все модели на выборке 3%
 poetry run insurance predict --model-path artifacts/lightgbm/model.joblib \
     --input new_customers.csv --output predictions.csv
+```
+
+Переобучение (процесс из [Model_retrain_BPMN.md](Model_retrain_BPMN.md)):
+
+```bash
+# один цикл: последний файл это новая партия данных, остальные это окно обучения
+poetry run insurance retrain --data batch_01.csv batch_02.csv --trigger new_data
+# проверка новой партии на дрейф относительно действующей модели
+poetry run insurance monitor --data batch_03.csv
+# демонстрация: 6 циклов подряд на реальных данных, отчёт docs/RETRAIN_DEMO.md
+poetry run python scripts/retrain_demo.py
 ```
 
 Библиотеки только для разведочного анализа (`phik`, `klib`, `shap`, `matplotlib`) вынесены в

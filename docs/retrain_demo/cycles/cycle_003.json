@@ -1,0 +1,27 @@
+{
+  "cycle": 3,
+  "trigger": "schedule",
+  "started_at": "2026-10-12T15:02:47+00:00",
+  "data_files": [
+    "D:\\Учеба 3 семестр\\Бизнес-применение машинного обучения\\insurance-cross-sell\\data\\batches\\batch_02.csv",
+    "D:\\Учеба 3 семестр\\Бизнес-применение машинного обучения\\insurance-cross-sell\\data\\batches\\batch_03.csv"
+  ],
+  "status": "rejected_data",
+  "version": null,
+  "champion": "v2",
+  "production_after": "v2",
+  "approved_by": null,
+  "data": {
+    "new_batch_rows": 200000,
+    "new_batch_positive_rate": 0.1224
+  },
+  "drift": {},
+  "gates": [
+    {
+      "name": "schema",
+      "passed": false,
+      "detail": "Missing values in columns: ['Annual_Premium']"
+    }
+  ],
+  "metrics": {}
+}

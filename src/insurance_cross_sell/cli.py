@@ -1,8 +1,9 @@
-"""Command line interface: `insurance download|train|tune|predict`."""
+"""Command line interface of the `insurance_cross_sell` package."""
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import logging
 from collections.abc import Sequence
@@ -11,6 +12,7 @@ from pathlib import Path
 from . import config
 from .data import download_data
 from .predict import predict_file
+from .retrain import CycleReport, ModelRegistry, check_drift, run_cycle
 from .train import prepare_split, train_models
 from .tuning import grid_search, optuna_search
 
@@ -69,7 +71,57 @@ def _build_parser() -> argparse.ArgumentParser:
     predict.add_argument("--input", type=Path, required=True)
     predict.add_argument("--output", type=Path, required=True)
 
+    retrain = sub.add_parser(
+        "retrain", help="run one retraining cycle with quality gates"
+    )
+    retrain.add_argument(
+        "--data",
+        type=Path,
+        nargs="+",
+        required=True,
+        help="training window; the last file is the new batch",
+    )
+    retrain.add_argument(
+        "--registry", type=Path, default=config.PROJECT_ROOT / "models"
+    )
+    retrain.add_argument(
+        "--trigger",
+        choices=["manual", "schedule", "new_data", "drift", "degradation"],
+        default="manual",
+    )
+    retrain.add_argument(
+        "--model", choices=config.MODEL_NAMES, default="lightgbm"
+    )
+    retrain.add_argument("--threshold", type=float, default=config.THRESHOLD)
+    retrain.add_argument("--params-file", type=Path, default=None)
+    retrain.add_argument(
+        "--auto-approve",
+        action="store_true",
+        help="approve publication without asking (demo, CI)",
+    )
+    retrain.add_argument(
+        "--simulate-deploy-failure", action="store_true", help="demo only"
+    )
+
+    monitor = sub.add_parser(
+        "monitor", help="check a new batch for drift against production"
+    )
+    monitor.add_argument("--data", type=Path, required=True)
+    monitor.add_argument(
+        "--registry", type=Path, default=config.PROJECT_ROOT / "models"
+    )
+
     return parser
+
+
+def _ask_approval(report: CycleReport) -> str | None:
+    metrics = report.metrics["challenger"]
+    print(
+        f"Challenger: ROC-AUC {metrics['roc_auc']:.4f}, "
+        f"F1 {metrics['f1']:.4f}; all checks passed."
+    )
+    answer = input("Approve publication? [y/N] ").strip().lower()
+    return getpass.getuser() if answer in {"y", "yes", "д", "да"} else None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -122,6 +174,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.command == "predict":
         result = predict_file(args.model_path, args.input, args.output)
         print(f"Wrote {len(result)} predictions to {args.output}")
+    elif args.command == "retrain":
+        params = (
+            json.loads(args.params_file.read_text(encoding="utf-8"))
+            if args.params_file
+            else None
+        )
+        report = run_cycle(
+            args.data,
+            ModelRegistry(args.registry),
+            trigger=args.trigger,
+            approver=(lambda r: "auto")
+            if args.auto_approve
+            else _ask_approval,
+            model_name=args.model,
+            params=params,
+            threshold=args.threshold,
+            simulate_deploy_failure=args.simulate_deploy_failure,
+        )
+        for gate in report.gates:
+            mark = "OK  " if gate.passed else "FAIL"
+            print(f"  [{mark}] {gate.name}: {gate.detail}")
+        print(
+            f"cycle {report.cycle}: {report.status}; "
+            f"version {report.version}; production {report.production_after}"
+        )
+        return 0 if report.status == "deployed" else 1
+    elif args.command == "monitor":
+        drift, detected = check_drift(args.data, ModelRegistry(args.registry))
+        for name, value in drift.items():
+            print(f"  PSI {name}: {value:.4f}")
+        print("drift detected" if detected else "no drift")
+        return 2 if detected else 0
     return 0
 
 

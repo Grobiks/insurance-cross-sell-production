@@ -67,6 +67,8 @@ convention = "pep257"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011", "D"]
+# Russian report text: long Markdown lines, Cyrillic letters in strings
+"scripts/*" = ["E501", "RUF001"]
 
 [tool.mypy]
 python_version = "3.12"
