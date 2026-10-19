@@ -139,6 +139,16 @@ poetry run insurance monitor --data batch_03.csv
 poetry run python scripts/retrain_demo.py
 ```
 
+**Windows и русские буквы в пути к проекту.** Poetry записывает в `.venv\Scripts\insurance.cmd` полный
+путь к Python, и если в нём есть кириллица, консоль в кодировке 866 не находит его («Системе не удается найти
+указанный путь»). Один раз после `poetry install` выполните:
+
+```bash
+poetry run python scripts/fix_windows_launcher.py
+```
+
+Запасной вариант без исправления: `python -m insurance_cross_sell` вместо `insurance`.
+
 Библиотеки только для разведочного анализа (`phik`, `klib`, `shap`, `matplotlib`) вынесены в
 необязательную группу: `poetry install --with eda`.
 
